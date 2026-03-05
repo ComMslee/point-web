@@ -33,11 +33,15 @@ export default function MemberDashboardPage() {
   });
 
   useEffect(() => {
-    if (_hasHydrated && !isAuthenticated) router.replace('/login');
-  }, [_hasHydrated, isAuthenticated, router]);
+    if (_hasHydrated && !isAuthenticated) {
+      document.cookie = 'member_auth=; path=/; max-age=0'; // 미들웨어 무한루프 방지
+      window.location.href = '/login';
+    }
+  }, [_hasHydrated, isAuthenticated]);
 
-  // hydration 완료 전 또는 미인증 상태: 빈 화면 (콘텐츠 노출 방지)
-  if (!_hasHydrated || !isAuthenticated) return null;
+  // hydration 전: 로딩 표시 (return null 시 흰 화면 발생)
+  if (!_hasHydrated) return <div className="min-h-screen bg-gray-50" />;
+  if (!isAuthenticated) return null;
 
   const balance = (balanceData as any)?.data?.balance ?? user?.pointBalance ?? 0;
   const history: PointTransaction[] = (historyData as any)?.data?.items ?? [];

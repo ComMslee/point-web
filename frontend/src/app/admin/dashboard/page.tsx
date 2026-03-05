@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../utils/api';
 import { useAdminAuthStore } from '../../../store/adminAuth.store';
@@ -20,8 +19,7 @@ const StatCard = ({ title, value, unit = '', color = 'text-gray-900' }: any) => 
 );
 
 export default function AdminDashboardPage() {
-  const { isAuthenticated, _hasHydrated } = useAdminAuthStore();
-  const router = useRouter();
+  const { isAuthenticated, _hasHydrated, clearAuth } = useAdminAuthStore();
   const [period, setPeriod] = useState({ startDate: '', endDate: '' });
 
   const { data: statsRes, isLoading } = useQuery({
@@ -31,11 +29,21 @@ export default function AdminDashboardPage() {
   });
 
   useEffect(() => {
-    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
-  }, [_hasHydrated, isAuthenticated, router]);
+    if (_hasHydrated && !isAuthenticated) {
+      document.cookie = 'admin_auth=; path=/; max-age=0'; // 미들웨어 무한루프 방지
+      window.location.href = '/admin/login';
+    }
+  }, [_hasHydrated, isAuthenticated]);
 
-  // hydration 완료 전 또는 미인증 상태: 빈 화면 (콘텐츠 노출 방지)
-  if (!_hasHydrated || !isAuthenticated) return null;
+  const handleLogout = () => {
+    clearAuth();
+    document.cookie = 'admin_auth=; path=/; max-age=0';
+    window.location.href = '/admin/login';
+  };
+
+  // hydration 전: 로딩 표시 (return null 시 흰 화면 발생)
+  if (!_hasHydrated) return <div className="min-h-screen bg-gray-50" />;
+  if (!isAuthenticated) return null;
 
   const stats: DashboardStats | undefined = (statsRes as any)?.data;
 
@@ -51,11 +59,17 @@ export default function AdminDashboardPage() {
       {/* 상단 네비 */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">관리자 대시보드</h1>
-        <nav className="flex gap-6 text-sm">
+        <nav className="flex items-center gap-6 text-sm">
           <a href="/admin/users" className="text-gray-600 hover:text-primary">회원관리</a>
           <a href="/admin/points" className="text-gray-600 hover:text-primary">포인트이력</a>
           <a href="/admin/policies" className="text-gray-600 hover:text-primary">정책설정</a>
           <a href="/admin/sites" className="text-gray-600 hover:text-primary">연동사이트</a>
+          <button
+            onClick={handleLogout}
+            className="ml-2 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            로그아웃
+          </button>
         </nav>
       </header>
 

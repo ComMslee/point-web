@@ -104,9 +104,14 @@ export class AdminService {
   async getPointHistory(params: any) {
     const { page = 1, limit = 30, userId, type, startDate, endDate, source } = params;
     const qb = this.txRepo.createQueryBuilder('tx')
-      .leftJoinAndSelect('tx.user', 'u')
-      .select(['tx', 'u.id', 'u.name', 'u.phone'])
-      .orderBy('tx.created_at', 'DESC')
+      .leftJoin('tx.user', 'u')
+      .select([
+        'tx.id', 'tx.userId', 'tx.type', 'tx.status', 'tx.source',
+        'tx.amount', 'tx.balanceBefore', 'tx.balanceAfter',
+        'tx.description', 'tx.referenceId', 'tx.expiresAt', 'tx.createdAt',
+        'u.id', 'u.name', 'u.phone',
+      ])
+      .orderBy('tx.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 

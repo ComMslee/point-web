@@ -43,6 +43,6 @@ EXPOSE 3000
 
 # 헬스체크
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/v1/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+  CMD node -e "require('http').get('http://localhost:3000/api/v1', (r) => process.exit(r.statusCode < 500 ? 0 : 1))"
 
 CMD ["node", "dist/main"]

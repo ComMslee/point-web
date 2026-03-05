@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../../utils/api';
 import { useAdminAuthStore } from '../../../store/adminAuth.store';
@@ -19,7 +18,6 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function AdminUsersPage() {
   const { isAuthenticated, _hasHydrated } = useAdminAuthStore();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -33,15 +31,7 @@ export default function AdminUsersPage() {
     enabled: _hasHydrated && isAuthenticated, // 인증 완료 전 API 호출 차단
   });
 
-  useEffect(() => {
-    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
-  }, [_hasHydrated, isAuthenticated, router]);
-
-  // hydration 완료 전 또는 미인증 상태: 빈 화면 (콘텐츠 노출 방지)
-  if (!_hasHydrated || !isAuthenticated) return null;
-
-  const result: PaginatedResult<User> = (res as any)?.data ?? { items: [], total: 0, totalPages: 1 };
-
+  // React Hooks Rules: useMutation은 반드시 조건부 return 전에 선언
   const statusMutation = useMutation({
     mutationFn: ({ userId, status, reason }: any) =>
       adminApi.updateUserStatus(userId, status, reason),
@@ -55,6 +45,19 @@ export default function AdminUsersPage() {
       setAdjustModal(false);
     },
   });
+
+  useEffect(() => {
+    if (_hasHydrated && !isAuthenticated) {
+      document.cookie = 'admin_auth=; path=/; max-age=0'; // 미들웨어 무한루프 방지
+      window.location.href = '/admin/login';
+    }
+  }, [_hasHydrated, isAuthenticated]);
+
+  // hydration 전: 로딩 표시 (return null 시 흰 화면 발생)
+  if (!_hasHydrated) return <div className="min-h-screen bg-gray-50" />;
+  if (!isAuthenticated) return null;
+
+  const result: PaginatedResult<User> = (res as any)?.data ?? { items: [], total: 0, totalPages: 1 };
 
   const handleAdjust = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

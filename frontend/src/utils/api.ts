@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '../store/auth.store';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -51,6 +52,7 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         } catch {
           useAuthStore.getState().clearAuth();
+          document.cookie = 'member_auth=; path=/; max-age=0'; // middleware 쿠키 제거
           window.location.href = '/login';
         }
       }
@@ -99,7 +101,8 @@ adminApiClient.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('adminAccessToken');
+        localStorage.removeItem('admin-auth-storage'); // Zustand persist 키와 일치
+        document.cookie = 'admin_auth=; path=/; max-age=0'; // middleware 쿠키 제거
         window.location.href = '/admin/login';
       }
     }

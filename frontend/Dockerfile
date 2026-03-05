@@ -21,7 +21,7 @@ ARG NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN mkdir -p /app/public && npm run build
 
 # ────────────────────────────────────────────────
 # Stage 3: 런타임

@@ -10,7 +10,7 @@ WORKDIR /app
 
 # 의존성 설치 (캐시 최적화)
 COPY package*.json ./
-RUN npm install --ignore-scripts
+RUN npm install
 
 # 소스 복사 및 빌드
 COPY . .

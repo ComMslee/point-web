@@ -45,7 +45,7 @@ export default function MemberDashboardPage() {
   const handleLogout = () => {
     clearAuth();
     document.cookie = 'member_auth=; path=/; max-age=0'; // middleware 쿠키 제거
-    router.replace('/login');
+    window.location.href = '/login'; // 하드 네비게이션으로 흰 화면 방지
   };
 
   return (

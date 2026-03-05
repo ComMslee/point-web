@@ -8,7 +8,9 @@ import { authApi } from '../../utils/api';
 import { useAuthStore } from '../../store/auth.store';
 
 const loginSchema = z.object({
-  phone: z.string().regex(/^01[0-9]{8,9}$/, '올바른 휴대폰 번호를 입력해주세요'),
+  phone: z.string()
+    .transform((v) => v.replace(/-/g, ''))
+    .pipe(z.string().regex(/^01[0-9]{8,9}$/, '올바른 휴대폰 번호를 입력해주세요')),
   password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다'),
 });
 type LoginForm = z.infer<typeof loginSchema>;

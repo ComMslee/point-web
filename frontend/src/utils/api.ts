@@ -63,16 +63,47 @@ export const pointsApi = {
     apiClient.post('/points/cancel', { transactionId, reason }),
 };
 
+// 관리자 전용 API 클라이언트 (adminAccessToken 사용)
+export const adminApiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE,
+  timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+adminApiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('adminAccessToken') : null;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+adminApiClient.interceptors.response.use(
+  (response) => response.data,
+  async (error) => {
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('adminAccessToken');
+        window.location.href = '/admin/login';
+      }
+    }
+    return Promise.reject(error.response?.data || error);
+  },
+);
+
+export const adminAuthApi = {
+  login: (email: string, password: string) =>
+    adminApiClient.post('/admin/auth/login', { email, password }),
+};
+
 export const adminApi = {
-  getDashboard: (params?: any) => apiClient.get('/admin/dashboard/stats', { params }),
-  getUsers: (params: any) => apiClient.get('/admin/users', { params }),
-  getUserDetail: (userId: string) => apiClient.get(`/admin/users/${userId}`),
+  getDashboard: (params?: any) => adminApiClient.get('/admin/dashboard/stats', { params }),
+  getUsers: (params: any) => adminApiClient.get('/admin/users', { params }),
+  getUserDetail: (userId: string) => adminApiClient.get(`/admin/users/${userId}`),
   updateUserStatus: (userId: string, status: string, reason?: string) =>
-    apiClient.patch(`/admin/users/${userId}/status`, { status, reason }),
-  adjustPoints: (data: any) => apiClient.post('/admin/points/adjust', data),
-  getPointHistory: (params: any) => apiClient.get('/admin/points/history', { params }),
-  getPolicies: () => apiClient.get('/admin/policies'),
-  createPolicy: (data: any) => apiClient.post('/admin/policies', data),
-  getExternalSites: () => apiClient.get('/admin/external-sites'),
-  createExternalSite: (data: any) => apiClient.post('/admin/external-sites', data),
+    adminApiClient.patch(`/admin/users/${userId}/status`, { status, reason }),
+  adjustPoints: (data: any) => adminApiClient.post('/admin/points/adjust', data),
+  getPointHistory: (params: any) => adminApiClient.get('/admin/points/history', { params }),
+  getPolicies: () => adminApiClient.get('/admin/policies'),
+  createPolicy: (data: any) => adminApiClient.post('/admin/policies', data),
+  getExternalSites: () => adminApiClient.get('/admin/external-sites'),
+  createExternalSite: (data: any) => adminApiClient.post('/admin/external-sites', data),
 };

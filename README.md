@@ -131,16 +131,18 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 
 | 용도 | 주소 |
 |------|------|
-| 회원 화면 | http://localhost:3001/login |
-| 관리자 화면 | http://localhost:3001/admin/dashboard |
+| 회원 로그인 | http://localhost:3001/login |
+| 관리자 로그인 | http://localhost:3001/admin/login |
+| 관리자 대시보드 | http://localhost:3001/admin/dashboard |
 | API 문서 (Swagger) | http://localhost:3000/api/docs |
 
-**기본 관리자 계정** (Swagger에서 `POST /api/v1/admin/auth/login` 사용)
+**기본 관리자 계정**
 ```
 이메일:   admin@pointsystem.com
 비밀번호: Admin@123!
 ```
 > 처음 접속 후 반드시 비밀번호를 변경하세요.
+> 관리자와 회원 인증은 완전히 분리되어 있습니다 (토큰 별도 관리).
 
 **테스트 회원 계정 10개** (로그인 화면에서 사용)
 
@@ -500,7 +502,8 @@ sp-connect/
 │       │   ├── earn/         # 포인트 적립 (준비 중)
 │       │   ├── use/          # 포인트 사용 (준비 중)
 │       │   └── history/      # 포인트 내역 (준비 중)
-│       └── admin/            # 관리자 화면 (로그인 필요)
+│       └── admin/            # 관리자 화면 (관리자 로그인 필요)
+│           ├── login/        # 관리자 로그인
 │           ├── dashboard/    # 대시보드
 │           └── users/        # 회원관리
 │

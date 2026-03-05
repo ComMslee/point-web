@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User, AuthProvider, UserStatus } from '../users/entities/user.entity';
+import { Admin } from '../admin/entities/admin.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 
@@ -18,6 +19,7 @@ export class AuthService {
 
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Admin) private readonly adminRepo: Repository<Admin>,
     @InjectRepository(RefreshToken) private readonly tokenRepo: Repository<RefreshToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -128,6 +130,30 @@ export class AuthService {
 
     await this.tokenRepo.update(stored.id, { revoked: true });
     return this.generateTokens(stored.user);
+  }
+
+  /**
+   * 관리자 로그인
+   */
+  async adminLogin(email: string, password: string) {
+    const admin = await this.adminRepo.findOne({
+      where: { email, isActive: true },
+      select: ['id', 'username', 'email', 'passwordHash', 'role', 'isActive'],
+    });
+
+    if (!admin) throw new UnauthorizedException('아이디 또는 비밀번호가 올바르지 않습니다.');
+    const isValid = await bcrypt.compare(password, admin.passwordHash);
+    if (!isValid) throw new UnauthorizedException('아이디 또는 비밀번호가 올바르지 않습니다.');
+
+    await this.adminRepo.update(admin.id, { lastLoginAt: new Date() });
+
+    const payload = { sub: admin.id, email: admin.email, role: admin.role, isAdmin: true };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '8h' });
+
+    return {
+      admin: { id: admin.id, username: admin.username, email: admin.email, role: admin.role },
+      tokens: { accessToken },
+    };
   }
 
   /**

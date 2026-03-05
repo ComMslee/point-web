@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../../utils/api';
-import { useAuthStore } from '../../../store/auth.store';
+import { useAdminAuthStore } from '../../../store/adminAuth.store';
 import { User, PaginatedResult } from '../../../types';
 import dayjs from 'dayjs';
 
@@ -18,12 +18,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, _hasHydrated } = useAdminAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) router.replace('/login');
-  }, [isAuthenticated, router]);
+    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
+  }, [_hasHydrated, isAuthenticated, router]);
 
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);

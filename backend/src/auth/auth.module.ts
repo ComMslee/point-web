@@ -10,11 +10,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { KakaoStrategy } from './strategies/kakao.strategy';
 import { NaverStrategy } from './strategies/naver.strategy';
 import { User } from '../users/entities/user.entity';
+import { Admin } from '../admin/entities/admin.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RefreshToken]),
+    TypeOrmModule.forFeature([User, Admin, RefreshToken]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

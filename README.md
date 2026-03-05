@@ -10,12 +10,15 @@
 2. [프로젝트 받기](#2-프로젝트-받기)
 3. [환경 변수 설정](#3-환경-변수-설정)
 4. [실행하기](#4-실행하기)
-5. [접속 주소 및 기본 계정](#5-접속-주소-및-기본-계정)
-6. [테스트 서버 배포 (Docker Compose)](#6-테스트-서버-배포-docker-compose)
-7. [AWS 배포 가이드](#7-aws-배포-가이드)
-8. [CI/CD 자동 배포](#8-cicd-자동-배포-github-actions)
-9. [자주 쓰는 명령어](#9-자주-쓰는-명령어)
-10. [프로젝트 구조](#10-프로젝트-구조)
+5. [Docker 컨테이너 구성](#5-docker-컨테이너-구성)
+6. [접속 주소 및 기본 계정](#6-접속-주소-및-기본-계정)
+7. [테스트 서버 배포 (Docker Compose)](#7-테스트-서버-배포-docker-compose)
+8. [AWS 배포 가이드](#8-aws-배포-가이드)
+9. [CI/CD 자동 배포](#9-cicd-자동-배포-github-actions)
+10. [자주 쓰는 명령어](#10-자주-쓰는-명령어)
+11. [프로젝트 구조](#11-프로젝트-구조)
+
+
 
 ---
 
@@ -102,19 +105,20 @@ docker-compose up -d
 docker-compose ps
 ```
 
-아래처럼 모두 `Up` 상태이면 정상입니다:
+아래처럼 모두 `Up (healthy)` 상태이면 정상입니다:
 ```
-NAME               STATUS
-point_postgres     Up (healthy)
-point_redis        Up (healthy)
-point_backend      Up (healthy)
-point_frontend     Up
-point_nginx        Up
+NAME             STATUS
+point_postgres   Up (healthy)
+point_redis      Up (healthy)
+point_backend    Up (healthy)
+point_frontend   Up (healthy)
+point_nginx      Up
 ```
 
 백엔드 로그 확인 (문제가 있을 때):
 ```bash
 docker-compose logs -f backend
+docker-compose logs -f frontend
 ```
 
 서비스 종료:
@@ -125,22 +129,142 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 
 ---
 
-## 5. 접속 주소 및 기본 계정
+## 5. Docker 컨테이너 구성
+
+`docker-compose up -d`를 실행하면 **5개 컨테이너**가 순서대로 올라옵니다.
+
+### 전체 구조
+
+```
+        사용자 (브라우저)
+               │
+               │ http://localhost
+               ▼
+       ┌───────────────┐
+       │  ⑤  Nginx    │  ← 입구에서 요청을 알맞은 곳으로 안내
+       └───┬───────┬───┘
+           │       │
+      웹화면│       │API 요청 (/api/*)
+           ▼       ▼
+    ┌─────────┐  ┌───────────────┐
+    │ ④ Front │  │  ③ Backend   │  ← 직접 접속도 가능
+    │  (화면) │  │  (비즈니스)  │    :3000/api/docs (Swagger)
+    │  :3001  │  └───┬───────┬───┘
+    └─────────┘      │       │
+                 DB  │       │  캐시
+                저장 │       │ 저장
+                     ▼       ▼
+              ┌──────────┐ ┌──────────┐
+              │ ① Postgres│ │ ② Redis  │
+              │ (데이터베이스)│ │ (캐시)   │
+              │  :5432   │ │  :6379   │
+              └──────────┘ └──────────┘
+```
+
+> **시작 순서**: ①②가 준비되면 → ③ 시작 → ③④가 준비되면 → ⑤ 시작
+
+### 컨테이너 역할 요약
+
+| # | 컨테이너 | 한 줄 설명 | 접속 포트 |
+|---|----------|-----------|-----------|
+| ① | `point_postgres` | 📦 모든 데이터를 영구 저장하는 데이터베이스 | 5432 |
+| ② | `point_redis` | ⚡ 로그인 토큰을 빠르게 저장하는 캐시 | 6379 |
+| ③ | `point_backend` | 🔧 로그인·포인트 등 모든 기능을 처리하는 API 서버 | 3000 |
+| ④ | `point_frontend` | 🖥️ 회원·관리자가 사용하는 웹 화면 | 3001 |
+| ⑤ | `point_nginx` | 🚦 요청을 ③④로 나눠 전달하는 관문 | 80, 443 |
+
+---
+
+### ① point_postgres — 데이터베이스
+
+회원 정보, 포인트 이력, 적립 정책 등 **모든 데이터를 영구 저장**합니다.
+컨테이너를 재시작하거나 껐다 켜도 데이터는 그대로 유지됩니다.
+
+- **DB 이름**: `pointdb`
+- **첫 실행 시**: `database/init.sql`이 자동으로 실행되어 테이블과 테스트 계정 10개가 생성됩니다.
+- **데이터 저장**: `postgres_data` 볼륨 (컨테이너 삭제해도 유지)
+
+```bash
+# DB에 직접 들어가서 SQL 실행하기
+docker exec -it point_postgres psql -U postgres -d pointdb
+```
+
+---
+
+### ② point_redis — 캐시
+
+로그인 시 발급된 **리프레시 토큰을 임시 저장**합니다.
+컨테이너를 재시작하면 저장 내용이 사라집니다 → 사용자는 재로그인이 필요합니다.
+
+```bash
+# Redis에 직접 접속하기
+docker exec -it point_redis redis-cli -a redis_secret
+```
+
+---
+
+### ③ point_backend — API 서버 (핵심)
+
+로그인, 포인트 적립/사용/조회 등 **모든 기능의 처리를 담당**합니다.
+DB(①)와 캐시(②)가 정상 기동된 후에 시작됩니다.
+
+- **API 주소**: `http://localhost:3000/api/v1`
+- **API 문서**: http://localhost:3000/api/docs (Swagger — 개발 시 유용)
+- **로그 저장**: `backend_logs` 볼륨
+
+---
+
+### ④ point_frontend — 웹 화면
+
+회원과 관리자가 사용하는 **웹 페이지를 제공**합니다.
+
+- **회원 로그인**: http://localhost:3001/login
+- **관리자 로그인**: http://localhost:3001/admin/login
+
+---
+
+### ⑤ point_nginx — 관문 (리버스 프록시)
+
+브라우저에서 들어오는 모든 요청을 받아 **알맞은 컨테이너로 전달**합니다.
+
+- `/api/*` 경로 → **백엔드(③)**로 전달
+- 그 외 모든 경로 → **프론트엔드(④)**로 전달
+
+덕분에 사용자는 포트 번호 없이 `http://localhost` 하나로 접속할 수 있습니다.
+
+---
+
+### 데이터 저장 위치 (볼륨)
+
+`docker-compose down`만으로는 데이터가 사라지지 않습니다.
+완전히 초기화하려면 `docker-compose down -v`를 사용하세요.
+
+| 볼륨 | 저장 내용 | `down -v` 시 영향 |
+|------|-----------|-------------------|
+| `postgres_data` | 회원·포인트 전체 데이터 | ⚠️ 모든 데이터 삭제 |
+| `redis_data` | 로그인 토큰 (임시) | 재로그인 필요 |
+| `backend_logs` | 서버 로그 파일 | 로그 기록 삭제 |
+
+---
+
+## 6. 접속 주소 및 기본 계정
 
 실행 후 브라우저에서 접속하세요:
 
 | 용도 | 주소 |
 |------|------|
-| 회원 화면 | http://localhost:3001/login |
-| 관리자 화면 | http://localhost:3001/admin/dashboard |
+| 회원 로그인 | http://localhost:3001/login |
+| 관리자 로그인 | http://localhost:3001/admin/login |
+| 관리자 대시보드 | http://localhost:3001/admin/dashboard |
 | API 문서 (Swagger) | http://localhost:3000/api/docs |
 
-**기본 관리자 계정** (Swagger에서 `POST /api/v1/admin/auth/login` 사용)
+**기본 관리자 계정**
 ```
 이메일:   admin@pointsystem.com
 비밀번호: Admin@123!
 ```
 > 처음 접속 후 반드시 비밀번호를 변경하세요.
+> 관리자와 회원 인증은 완전히 분리되어 있습니다 (토큰 별도 관리).
 
 **테스트 회원 계정 10개** (로그인 화면에서 사용)
 
@@ -158,7 +282,7 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 
 ---
 
-## 6. 테스트 서버 배포 (Docker Compose)
+## 7. 테스트 서버 배포 (Docker Compose)
 
 AWS 없이 **일반 리눅스 서버 (VPS, 사내 서버, 클라우드 VM 등)** 에도 그대로 올릴 수 있습니다.
 로컬 실행과 방식이 동일하고, 도메인/HTTPS만 추가로 설정하면 됩니다.
@@ -293,7 +417,7 @@ docker-compose up -d --build
 
 ---
 
-## 7. AWS 배포 가이드
+## 8. AWS 배포 가이드
 
 ### 전체 구조
 
@@ -425,7 +549,7 @@ aws ecs update-service \
 
 ---
 
-## 8. CI/CD 자동 배포 (GitHub Actions)
+## 9. CI/CD 자동 배포 (GitHub Actions)
 
 `main` 브랜치에 push하면 자동으로 테스트 → 빌드 → AWS 배포까지 실행됩니다.
 
@@ -457,7 +581,7 @@ main 브랜치에 push
 
 ---
 
-## 9. 자주 쓰는 명령어
+## 10. 자주 쓰는 명령어
 
 ```bash
 # 전체 재시작
@@ -479,7 +603,7 @@ docker-compose up -d --build backend
 
 ---
 
-## 10. 프로젝트 구조
+## 11. 프로젝트 구조
 
 ```
 sp-connect/
@@ -500,7 +624,8 @@ sp-connect/
 │       │   ├── earn/         # 포인트 적립 (준비 중)
 │       │   ├── use/          # 포인트 사용 (준비 중)
 │       │   └── history/      # 포인트 내역 (준비 중)
-│       └── admin/            # 관리자 화면 (로그인 필요)
+│       └── admin/            # 관리자 화면 (관리자 로그인 필요)
+│           ├── login/        # 관리자 로그인
 │           ├── dashboard/    # 대시보드
 │           └── users/        # 회원관리
 │

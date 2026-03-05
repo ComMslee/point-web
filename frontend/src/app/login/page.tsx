@@ -7,8 +7,19 @@ import { z } from 'zod';
 import { authApi } from '../../utils/api';
 import { useAuthStore } from '../../store/auth.store';
 
+// 010-1234-5678 또는 01012345678 → 010-1234-5678 정규화
+function normalizePhone(v: string): string {
+  const digits = v.replace(/-/g, '');
+  if (/^01[0-9]{9}$/.test(digits)) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  }
+  return v;
+}
+
 const loginSchema = z.object({
-  phone: z.string().regex(/^01[0-9]{8,9}$/, '올바른 휴대폰 번호를 입력해주세요'),
+  phone: z.string()
+    .transform(normalizePhone)
+    .pipe(z.string().regex(/^01[0-9]-[0-9]{4}-[0-9]{4}$/, '올바른 휴대폰 번호를 입력해주세요')),
   password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다'),
 });
 type LoginForm = z.infer<typeof loginSchema>;

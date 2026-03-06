@@ -11,7 +11,7 @@ const BASE_URL = 'http://localhost:3001';
 const OUT_DIR = path.join(__dirname, '..', 'docs', 'images');
 const ADMIN_EMAIL = 'admin@pointsystem.com';
 const ADMIN_PASS = 'Admin@123!';
-const MEMBER_PHONE = '010-0000-0001';
+const MEMBER_EMAIL = 'test4@test.com';
 const MEMBER_PASS = 'Test1234!';
 const CAPTURE_TIME = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 
@@ -112,7 +112,7 @@ async function run() {
   {
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
-    await page.fill('input[name="phone"]', MEMBER_PHONE);
+    await page.fill('input[name="email"]', MEMBER_EMAIL);
     await page.fill('input[name="password"]', MEMBER_PASS);
     await page.click('button[type="submit"]');
     await page.waitForURL(`${BASE_URL}/member/dashboard`, { timeout: 8000 }).catch(() => {});
